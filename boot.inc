@@ -1,0 +1,2 @@
+LOAD_BASE_ADDR equ 0x900 ;汇编的宏定义
+LOAD_START_SECTION equ 0x02
