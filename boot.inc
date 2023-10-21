@@ -1,6 +1,6 @@
 ;--------  loder 和 kernel  ------------
-LOAD_BASE_ADDR equ 0x900 ;汇编的宏定义
-LOAD_START_SECTION equ 0x02
+LOADER_BASE_ADDR equ 0x900 ;汇编的宏定义
+LOADER_START_SECTOR equ 0x02
 
 ;------------------------------------------gdt描述符属性-----------------------------------------------------
 DESC_G_4K  equ  1_00000000000000000000000b  ;4k的粒度在段描述符中为高第23位

@@ -32,14 +32,14 @@ mov byte [gs:0x08],'R'
 mov byte [gs:0x09],0xA4 
 
 ;设置参数
-mov eax,LOAD_START_SECTION ;由寄存器传递参数eax中放入LBA中的扇区编号
-mov bx,LOAD_BASE_ADDR      ;bx寄存器中存放内存地址
-mov cx,1                   ;cx存放读取扇区数
+mov eax,LOADER_START_SECTION ;由寄存器传递参数eax中放入LBA中的扇区编号
+mov bx,LOADER_BASE_ADDR      ;bx寄存器中存放内存地址
+mov cx,2                   ;cx存放读取扇区数
 
 ;函数调用
 call rd_disk_m_16
 
-jmp LOAD_BASE_ADDR         ;跳转指令，由load代码拥有cpu使用权
+jmp LOADER_BASE_ADDR         ;跳转指令，由load代码拥有cpu使用权
 
 ;从磁盘中读取n个扇区的数据到指定内存位置
 rd_disk_m_16:

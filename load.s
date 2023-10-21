@@ -1,7 +1,7 @@
 %include "boot.inc"
-section load vstart = LOAD_BASE_ADDR
-LOAD_STACK_TOP equ LOAD_BASE_ADDR
-jmp load_start
+section load vstart=LOAD_BASE_ADDR
+LOADER_STACK_TOP equ LOAD_BASE_ADDR
+jmp loader_start
 
 ;构建gdt及其内部描述符  dd是一个伪指令从前向后开辟4字节
 GDT_BASE: dd 0x00000000
@@ -32,7 +32,7 @@ loadmsg db '2 loader in real'
 
 ;----------------------初始化工作完成,代码开始执行-----------------------
 [bits 16]
-load_start:
+loader_start:
 
 ;----------------------用int 0x10号中断实现向屏幕输出---------------------------
 ;输入:
@@ -45,13 +45,13 @@ load_start:
 ;AL = 显示输出方式
 ; 0 ——————— 字符串中只含显示字符，其显示属性在BL中
             ;显示后，光标位置不变
-  1 ——————— 字符串中只含显示字符，其显示属性在BL中
+;  1 ——————— 字符串中只含显示字符，其显示属性在BL中
             ;显示后，光标位置改变
 ; 2 ——————— 字符串中含显示字符和显示属性。显示后，光标位置不变
 ; 3 ——————— 字符串中含显示字符和显示属性。显示后，光标位置改变
 ;无返回值
 
-mov sp, LOAD_BASE_ADDR
+mov sp, LOADER_BASE_ADDR
 mov bp, loadmsg
 mov cx, 17
 mov ax, 0x1301
