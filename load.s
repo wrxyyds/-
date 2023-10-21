@@ -1,89 +1,94 @@
-%include "boot.inc"
-section load vstart=LOAD_BASE_ADDR
-LOADER_STACK_TOP equ LOAD_BASE_ADDR
-jmp loader_start
+   %include "boot.inc"
+   section loader vstart=LOADER_BASE_ADDR
+   LOADER_STACK_TOP equ LOADER_BASE_ADDR
+   jmp loader_start					; 此处的物理地址是:
+   
+;构建gdt及其内部的描述符
+   GDT_BASE:   dd    0x00000000 
+	       dd    0x00000000
 
-;构建gdt及其内部描述符  dd是一个伪指令从前向后开辟4字节
-GDT_BASE: dd 0x00000000
-          dd 0x00000000  ;全局段描述符表的第一个描述符，因为第一个描述符不可用所以全置为0
+   CODE_DESC:  dd    0x0000FFFF 
+	       dd    DESC_CODE_HIGH4
 
-CODE_DESC: dd 0x0000FFFF ;段基址在高4字节关于段基址的位都置为0，段界限相关的位都置为1，在这里第4字节中的第16位置为1设置最大段界限值，高16位置为0设置段基址位0
-           dd DESC_CODE_HIGH4 ; dpl为0
+   DATA_STACK_DESC:  dd    0x0000FFFF
+		     dd    DESC_DATA_HIGH4
 
-DATA_STACK_DESC: dd 0x0000FFFF
-                 dd DESC_DATA_HIGH4 ; 这个数据栈段段基址为0x0，向上扩展的不可执行，可写入，dpl为0,且已访问位a已经清0
+   VIDEO_DESC: dd    0x80000007	       ;limit=(0xbffff-0xb8000)/4k=0x7
+	       dd    DESC_VIDEO_HIGH4  ; 此时dpl已改为0
 
-VIDEO_DESC: dd 0xb8000007 ;电脑显存文本段的内存空间位0xb800--0xbfff,因为此段粒度为4k，界限值为(0xbfff-0xb800)/4k=7
-            dd DESC_VIDEO_HIGH4 ;设置高四位
+   GDT_SIZE   equ   $ - GDT_BASE
+   GDT_LIMIT   equ   GDT_SIZE -	1 
+   times 60 dq 0					 ; 此处预留60个描述符的slot
+   SELECTOR_CODE equ (0x0001<<3) + TI_GDT + RPL0         ; 相当于(CODE_DESC - GDT_BASE)/8 + TI_GDT + RPL0
+   SELECTOR_DATA equ (0x0002<<3) + TI_GDT + RPL0	 ; 同上
+   SELECTOR_VIDEO equ (0x0003<<3) + TI_GDT + RPL0	 ; 同上 
 
-GDT_SIZE equ $ - GDT_BASE ;计算表的大小
-GDT_LIMIT equ GDT_SIZE - 1 ;界限值是从0开始的，及0代表1有一个粒度大小的空间
-times 60 dq 0  ;预留60个8字节描述符
+   ;以下是定义gdt的指针，前2字节是gdt界限，后4字节是gdt起始地址
 
-SELECTOR_CODE equ (0x0001 << 3) + TI_GDT + RPL0 ;选择子放在段寄存器上是16位的，高13位表示描述符在GDT中的索引值，最后两位代表段的权限级，第三位表示是在GDT中还是在LDT中
-SELECTOR_DATA equ (0x0002 << 3) + TI_GDT + RPL0
-SELECTOR_VIDEO equ (0x003 << 3) + TI_GDT + RPL0
+   gdt_ptr  dw  GDT_LIMIT 
+	    dd  GDT_BASE
+   loadermsg db '2 loader in real.'
 
-gdt_ptr dw GDT_LIMIT
-        dd GDT_BASE
+   loader_start:
 
-loadmsg db '2 loader in real'
-
-
-;----------------------初始化工作完成,代码开始执行-----------------------
-[bits 16]
-loader_start:
-
-;----------------------用int 0x10号中断实现向屏幕输出---------------------------
+;------------------------------------------------------------
+;INT 0x10    功能号:0x13    功能描述:打印字符串
+;------------------------------------------------------------
 ;输入:
-;AH 子功能号 = 13H
+;AH 子功能号=13H
 ;BH = 页码
-;BL = 属性（）
-;cx = 字符串长度
-;(DH, DL) = 坐标（行列）
-;es:ip = 字符串地址
-;AL = 显示输出方式
-; 0 ——————— 字符串中只含显示字符，其显示属性在BL中
-            ;显示后，光标位置不变
-;  1 ——————— 字符串中只含显示字符，其显示属性在BL中
-            ;显示后，光标位置改变
-; 2 ——————— 字符串中含显示字符和显示属性。显示后，光标位置不变
-; 3 ——————— 字符串中含显示字符和显示属性。显示后，光标位置改变
+;BL = 属性(若AL=00H或01H)
+;CX＝字符串长度
+;(DH、DL)＝坐标(行、列)
+;ES:BP＝字符串地址 
+;AL＝显示输出方式
+;   0——字符串中只含显示字符，其显示属性在BL中。显示后，光标位置不变
+;   1——字符串中只含显示字符，其显示属性在BL中。显示后，光标位置改变
+;   2——字符串中含显示字符和显示属性。显示后，光标位置不变
+;   3——字符串中含显示字符和显示属性。显示后，光标位置改变
 ;无返回值
+   mov	 sp, LOADER_BASE_ADDR
+   mov	 bp, loadermsg           ; ES:BP = 字符串地址
+   mov	 cx, 17			 ; CX = 字符串长度
+   mov	 ax, 0x1301		 ; AH = 13,  AL = 01h
+   mov	 bx, 0x001f		 ; 页号为0(BH = 0) 蓝底粉红字(BL = 1fh)
+   mov	 dx, 0x1800		 ;
+   int	 0x10                    ; 10h 号中断
 
-mov sp, LOADER_BASE_ADDR
-mov bp, loadmsg
-mov cx, 17
-mov ax, 0x1301
-mov bx, 0x001f
-mov dx, 0x1800
-int 0x10
+;----------------------------------------   准备进入保护模式   ------------------------------------------
+									;1 打开A20
+									;2 加载gdt
+									;3 将cr0的pe位置1
 
-;-----------------打开A20地址线---------------------
-in al, 0x92
-or al, 0000_0010b
-out 0x92, al
 
-;----------------加载 GDT-------------------------
-lgdt [gdt_ptr] ;lgdt 48位空间，前16位是界限值，后32位为段基址地址
+   ;-----------------  打开A20  ----------------
+   in al,0x92
+   or al,0000_0010B
+   out 0x92,al
 
-;--------------cr0寄存器 0位置为1------------------
-mov eax, cr0
-or eax, 0x00000001
-mov cr0, eax
+   ;-----------------  加载GDT  ----------------
+   lgdt [gdt_ptr]
 
-jmp dword SELECTOR_CODE:p_mode_start   ;刷新流水线
 
+   ;-----------------  cr0第0位置1  ----------------
+   mov eax, cr0
+   or eax, 0x00000001
+   mov cr0, eax
+
+   ;jmp dword SELECTOR_CODE:p_mode_start	     ; 刷新流水线，避免分支预测的影响,这种cpu优化策略，最怕jmp跳转，
+   jmp  SELECTOR_CODE:p_mode_start	     ; 刷新流水线，避免分支预测的影响,这种cpu优化策略，最怕jmp跳转，
+					     ; 这将导致之前做的预测失效，从而起到了刷新的作用。
 
 [bits 32]
 p_mode_start:
-mov ax, SELECTOR_DATA
-mov ds, ax
-mov es, ax
-mov ss, ax
-mov esp, LOAD_STACK_TOP
-mov ax, SELECTOR_VIDEO
-mov gs, ax
-mov byte [gs:160], 'p'
+   mov ax, SELECTOR_DATA
+   mov ds, ax
+   mov es, ax
+   mov ss, ax
+   mov esp,LOADER_STACK_TOP
+   mov ax, SELECTOR_VIDEO
+   mov gs, ax
 
-jmp $
+   mov byte [gs:160], 'P'
+
+   jmp $

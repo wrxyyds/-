@@ -1,105 +1,126 @@
+;主引导程序 
+;------------------------------------------------------------
 %include "boot.inc"
-SECTION MBR vstart=0x7c00 
-mov ax,cs 
-mov ds,ax 
-mov es,ax 
-mov ss,ax 
-mov fs,ax 
-mov sp,0x7c00 
-mov ax,0xb800 
-mov gs,ax 
- 
-mov ax, 0600h 
-mov bx, 0700h 
-mov cx, 0  
-mov dx, 184fh
+SECTION MBR vstart=0x7c00         
+   mov ax,cs      
+   mov ds,ax
+   mov es,ax
+   mov ss,ax
+   mov fs,ax
+   mov sp,0x7c00
+   mov ax,0xb800
+   mov gs,ax
 
-int 0x10
+; 清屏
+;利用0x06号功能，上卷全部行，则可清屏。
+; -----------------------------------------------------------
+;INT 0x10   功能号:0x06	   功能描述:上卷窗口
+;------------------------------------------------------
+;输入：
+;AH 功能号= 0x06
+;AL = 上卷的行数(如果为0,表示全部)
+;BH = 上卷行属性
+;(CL,CH) = 窗口左上角的(X,Y)位置
+;(DL,DH) = 窗口右下角的(X,Y)位置
+;无返回值：
+   mov     ax, 0600h
+   mov     bx, 0700h
+   mov     cx, 0                   ; 左上角: (0, 0)
+   mov     dx, 184fh		   ; 右下角: (80,25),
+				   ; 因为VGA文本模式中，一行只能容纳80个字符,共25行。
+				   ; 下标从0开始，所以0x18=24,0x4f=79
+   int     10h                     ; int 10h
 
-mov byte [gs:0x00],'1' 
-mov byte [gs:0x01],0xA4    ;A 表示绿色背景闪烁，4 表示前景色为红色
- 
-mov byte [gs:0x02],' ' 
-mov byte [gs:0x03],0xA4 
- 
-mov byte [gs:0x04],'M' 
-mov byte [gs:0x05],0xA4 
+   ; 输出字符串:MBR
+   mov byte [gs:0x00],'1'
+   mov byte [gs:0x01],0xA4
 
-mov byte [gs:0x06],'B' 
-mov byte [gs:0x07],0xA4 
- 
-mov byte [gs:0x08],'R' 
-mov byte [gs:0x09],0xA4 
+   mov byte [gs:0x02],' '
+   mov byte [gs:0x03],0xA4
 
-;设置参数
-mov eax,LOADER_START_SECTION ;由寄存器传递参数eax中放入LBA中的扇区编号
-mov bx,LOADER_BASE_ADDR      ;bx寄存器中存放内存地址
-mov cx,2                   ;cx存放读取扇区数
+   mov byte [gs:0x04],'M'
+   mov byte [gs:0x05],0xA4	   ;A表示绿色背景闪烁，4表示前景色为红色
 
-;函数调用
-call rd_disk_m_16
+   mov byte [gs:0x06],'B'
+   mov byte [gs:0x07],0xA4
 
-jmp LOADER_BASE_ADDR         ;跳转指令，由load代码拥有cpu使用权
+   mov byte [gs:0x08],'R'
+   mov byte [gs:0x09],0xA4
+	 
+   mov eax,LOADER_START_SECTOR	 ; 起始扇区lba地址
+   mov bx,LOADER_BASE_ADDR       ; 写入的地址
+   mov cx,4			 ; 待读入的扇区数
+   call rd_disk_m_16		 ; 以下读取程序的起始部分（一个扇区）
+  
+   jmp LOADER_BASE_ADDR
+       
+;-------------------------------------------------------------------------------
+;功能:读取硬盘n个扇区
+rd_disk_m_16:	   
+;-------------------------------------------------------------------------------
+				       ; eax=LBA扇区号
+				       ; ebx=将数据写入的内存地址
+				       ; ecx=读入的扇区数
+      mov esi,eax	  ;备份eax
+      mov di,cx		  ;备份cx
+;读写硬盘:
+;第1步：设置要读取的扇区数
+      mov dx,0x1f2
+      mov al,cl
+      out dx,al            ;读取的扇区数
 
-;从磁盘中读取n个扇区的数据到指定内存位置
-rd_disk_m_16:
-mov esi,eax                ;备份eax
-mov di,cx                  ;备份cx
+      mov eax,esi	   ;恢复ax
 
-;第一步：向0x1F2端口写入读取扇区的数量
-mov dx,0x1F2               ;dx寄存器指定端口号
-mov al,cl
-out dx,al                  ;写入0x1F2端口
+;第2步：将LBA地址存入0x1f3 ~ 0x1f6
 
-;第二步：
-;分别向0x1F3,0x1F4,0x1F5,0x1F6端口写入所要读取的磁盘位置,并设置成LBA模式
-;0x1F3存放0——7位，0x1F4存放8——15位，0x1F5存放16——23位，24——27位存放到0x1F6端口中，并在其端口设置LBA模式
-mov eax,esi                ;恢复eax的值
-mov dx,0x1F3               ;确定端口号
-out dx,al                  ;写入低8位
+      ;LBA地址7~0位写入端口0x1f3
+      mov dx,0x1f3                       
+      out dx,al                          
 
-mov cl,8
-shr eax,cl
-mov dx,0x1f4
-out dx,al
+      ;LBA地址15~8位写入端口0x1f4
+      mov cl,8
+      shr eax,cl
+      mov dx,0x1f4
+      out dx,al
 
-shr eax,cl
-mov dx,0x1F5
-out dx,al
+      ;LBA地址23~16位写入端口0x1f5
+      shr eax,cl
+      mov dx,0x1f5
+      out dx,al
 
-shr eax,cl
-and al,0x0F                ;保留4位
-or al,0xe0                 ;设置7——4位位1110
-mov dx,0x1F6
-out dx,al
+      shr eax,cl
+      and al,0x0f	   ;lba第24~27位
+      or al,0xe0	   ; 设置7～4位为1110,表示lba模式
+      mov dx,0x1f6
+      out dx,al
 
-;第三步：向0x1F7端口写入命令，0x20表示从磁盘读取数据
-mov dx,0x1F7
-mov al,0x20
-out dx,al
+;第3步：向0x1f7端口写入读命令，0x20 
+      mov dx,0x1f7
+      mov al,0x20                        
+      out dx,al
 
-;第四不：检查读取是否完成，检查0x1F7端口
-.not_ready:
-nop                        ;cpu不执行任何指令，相当于等待一会
-in al,dx                   ;此时dx仍为0x1F7
-and al,0x88                ;第四位为1表示硬盘控制器已经读取完成，第八位位1表示硬盘忙0x88 10001000
-cmp al,0x08
-jnz .not_ready             ;上一个指令结果不为0表示磁盘数据没有完全读取到磁盘控制器的缓冲区中，进行循环直到读取完成跳出循环继续执行
+;第4步：检测硬盘状态
+  .not_ready:
+      ;同一端口，写时表示写入命令字，读时表示读入硬盘状态
+      nop
+      in al,dx
+      and al,0x88	   ;第4位为1表示硬盘控制器已准备好数据传输，第7位为1表示硬盘忙
+      cmp al,0x08
+      jnz .not_ready	   ;若未准备好，继续等。
 
-;第五步：将数据从缓冲区读入到指定内存中，从端口0x1f0读取数据，读取一次是2字节（0x1F0寄存器是16位，其他的端口都是8位）
-mov ax,di                  ;di表示要读取的扇区数
-mov dx,256
-mul dx                     ;ax存放低16位结果
-mov cx,ax                  ;表示读取的次数
+;第5步：从0x1f0端口读数据
+      mov ax, di
+      mov dx, 256
+      mul dx
+      mov cx, ax	   ; di为要读取的扇区数，一个扇区有512字节，每次读入一个字，
+			   ; 共需di*512/2次，所以di*256
+      mov dx, 0x1f0
+  .go_on_read:
+      in ax,dx
+      mov [bx],ax
+      add bx,2		  
+      loop .go_on_read
+      ret
 
-mov dx,0x1F0
-.go_on_read:
-in ax,dx                   ;从0x1F0端口读取数据
-mov [bx],ax                ;bx为0x900是LOAD_BASE_ADDR
-add bx,2                   ;bx向后移动2字节
-loop .go_on_read
-
-ret                        ;函数返回
-
-times 510-($-$$) db 0      ;保障mbr有512字节
-db 0x55,0xaa               ;结束标志
+   times 510-($-$$) db 0
+   db 0x55,0xaa
