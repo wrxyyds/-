@@ -33,3 +33,11 @@ RPL2  equ   10b
 RPL3  equ   11b
 TI_GDT	 equ   000b
 TI_LDT	 equ   100b
+
+;-------------  开启分页模式  ----------------
+PAGE_DIR_TABLE_POS   equ     0x100000  ;页目录表的物理地址前1MB空间留给操作系统使用
+PG_P    equ    1b      ;表示该页是否存在，0表示不存在，1表示存在
+PG_RW_W   equ  10b     ;表示该页是否可写
+PG_RW_R   equ  00b     ;表示该页是否可读
+PG_US_S   equ  000b    ;表示该页的访问权限，1表示只有特权级为0，1，2可访问3级权限不可访问
+PG_US_U   equ  100b

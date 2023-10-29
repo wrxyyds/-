@@ -177,5 +177,86 @@ p_mode_start:
    mov ax, SELECTOR_VIDEO
    mov gs, ax
 
+   ; 创建页目录及页表并初始化页内存位图
+   call setup_page
+
+   ;要将描述符表地址及偏移量写入内存 gdt_ptr，一会儿用新地址重新加载
+   sgdt [gdt_ptr]   ;将gtdr寄存器中的信息存到gdt_ptr中
+
+   ;将 gdt 描述符中视频段描述符中的段基址+0xc0000000
+   mov ebx, [gdt_ptr + 2]
+   or dword [ebx + 0x18 + 4], 0xc0000000
+
+   ;将 gdt 的基址加上 0xc0000000 使其成为内核所在的高地址
+   add dword [gdt_ptr + 2], 0xc00000000
+
+   add esp, 0xc0000000 ;将栈指针同样映射到内核地址
+
+   ; 把页目录地址赋值 cr3
+   mov eax, PAGE_DIR_TABLE_POS
+   mov cr3, eax
+
+   ;打开cr0的pg位（31位）
+   mov eax, cr0
+   or eax, 0x80000000
+   mov cr0, eax
+
+   ;在开启分页后，用 gdt 新的地址重新加载
+   lgdt [gdt_ptr] ; 重新加载
+
+   mov byte [gs:160], 'V'  ;视频段段基址已经被更新，用字符 v 表示 virtual addr 
 
    jmp $
+
+   ;------------- 创建页目录及页表 ---------------
+   setup_page:
+   ;先把页目录占用的空间逐字节清 0
+   mov ecx, 4096  ;一共有1024给页目录项每个页目录项4字节  所以页目录表共占4KB空间
+   mov esi, 0
+   .clear_page_dir:
+   mov byte [PAGE_DIR_TABLE_POS + esi], 0
+   inc esi
+   loop .clear_page_dir
+
+   ;开始创建页目录项(PDE)
+   .create_pde:    ;创建 Page Directory Entry
+   mov eax, PAGE_DIR_TABLE_POS    ;起始地址0x100000
+   add eax, 0x1000   ;第一个页表的起始地址
+   mov ebx, eax   ;此处为ebx赋值，是为了.create.pde做准备，ebx为基址地址
+
+   ;下面将页目录项0和0xc00都存为第一个页表地址，每个页表项指向4KB空间的物理地址，所以一共页表指向4MB空间的物理地址
+   ;这样0xc03fffff一下的地址和0x003fffff一下的地址都指向相同的页表
+   ;这是为将地址映射为内核地址做准备
+   or eax, PG_US_U | PG_RW_W | PG_P
+   ; 页目录项的属性RW和P位为1，US为1表示用户属性，所有特权级都可以访问
+   mov [PAGE_DIR_TABLE_POS + 0x0], eax  ;第一个页目录项，指向第一个页表其地址为0x100000(页目录基地址) + 0x10000(页目录大小4KB)
+   mov [PAGE_DIR_TABLE_POS + 0xc00], eax  ;第768个页目录项也指向地址为0x101000地址处的页表，0xc00 以上的目录项用于内核空间
+   ;也就是页表的 0xc0000000～0xffffffff 共计 1G 属于内核
+   ; 0x0～0xbfffffff 共计 3G 属于用户进程 及表示0号到767号页目录项都指向用户空间
+   sub eax, 0x1000
+   mov [PAGE_DIR_TABLE_POS + 4092], eax  ; 使最后一个目录项指向页目录表自己的地址1023*4
+
+    ;下面创建页表项(PTE)
+    mov ecx, 256  ;低端内存 / 每页大小 4K = 256
+    mov esi, 0
+    mov edx, PG_US_U | PG_RW_W | PG_P ;属性为 7，US=1，RW=1，P=1 
+    .create_pte: ;创建 Page Table Entry
+    mov [ebx+esi*4], edx
+    add edx,4096
+    inc esi
+    loop .create_pte
+
+    ;创建内核其他页表的PDE
+    mov eax, PAGE_DIR_TABLE_POS
+    add eax, 0x2000 ;第二个页表的位置
+    or eax, PG_US_U | PG_RW_W | PG_P
+    mov ebx, PAGE_DIR_TABLE_POS
+    mov ecx, 254   ;表示769到1022所有的页目录项
+    mov esi, 769
+    .create_kernel_pde:
+    mov [ebx+esi*4], eax
+    inc esi
+    add eax, 0x1000
+    loop .create_kernel_pde
+    ret
+
