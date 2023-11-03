@@ -2,6 +2,7 @@
 
 LOADER_BASE_ADDR equ 0x900 
 LOADER_START_SECTOR equ 0x2
+LOADER_STACK_TOP equ LOADER_BASE_ADDR
 
 ;--------------   gdt描述符属性  -------------
 DESC_G_4K   equ	  1_00000000000000000000000b   
@@ -40,4 +41,4 @@ PG_P    equ    1b      ;表示该页是否存在，0表示不存在，1表示存
 PG_RW_W   equ  10b     ;表示该页是否可写
 PG_RW_R   equ  00b     ;表示该页是否可读
 PG_US_S   equ  000b    ;表示该页的访问权限，1表示只有特权级为0，1，2可访问3级权限不可访问
-PG_US_U   equ  100b
+PG_US_U   equ  100b    ;表示该页的访问权限，super权限，3级特权级不可访问

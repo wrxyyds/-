@@ -1,6 +1,5 @@
    %include "boot.inc"
    section loader vstart=LOADER_BASE_ADDR 
-   LOADER_STACK_TOP equ LOADER_BASE_ADDR
 ;构建gdt及其内部的描述符
    GDT_BASE:   dd    0x00000000 
 	       dd    0x00000000
@@ -110,33 +109,6 @@
 
 .mem_get_ok:
    mov [total_mem_bytes], edx
-   ;打印内存容量
-   mov ax, 0xb800
-   mov gs, ax
-   mov byte [gs:0x10], 's'
-   mov byte [gs:0x11], 0xA4
-   mov byte [gs:0x12], 'i'
-   mov byte [gs:0x13], 0xA4
-   mov byte [gs:0x14], 'z'
-   mov byte [gs:0x15], 0xA4
-   mov byte [gs:0x16], 'e'
-   mov byte [gs:0x17], 0xA4
-   mov byte [gs:0x18], ' '
-   mov byte [gs:0x19], 0xA4
-   ;将真正的数值传递到显存中
-   mov cx, 32                 ;将32位内容全部打印出来
-   mov si, total_mem_bytes    ;源地址
-   mov di, 0x001A             ;目的地址
-   mov ax, 0
-   mov es, ax
-.print_size:                  ;小端字节序
-   mov bl, [es:si]
-   mov [gs:di], bl
-   inc si
-   inc di
-   mov byte [gs:di], 0xA4
-   inc di
-   loop .print_size
 
 
 
@@ -188,7 +160,7 @@ p_mode_start:
    or dword [ebx + 0x18 + 4], 0xc0000000
 
    ;将 gdt 的基址加上 0xc0000000 使其成为内核所在的高地址
-   add dword [gdt_ptr + 2], 0xc00000000
+   add dword [gdt_ptr + 2], 0xc0000000
 
    add esp, 0xc0000000 ;将栈指针同样映射到内核地址
 
@@ -259,4 +231,3 @@ p_mode_start:
     add eax, 0x1000
     loop .create_kernel_pde
     ret
-
