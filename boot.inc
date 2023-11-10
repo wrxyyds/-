@@ -42,3 +42,9 @@ PG_RW_W   equ  10b     ;表示该页是否可写
 PG_RW_R   equ  00b     ;表示该页是否可读
 PG_US_S   equ  000b    ;表示该页的访问权限，1表示只有特权级为0，1，2可访问3级权限不可访问
 PG_US_U   equ  100b    ;表示该页的访问权限，super权限，3级特权级不可访问
+
+;-------------  加载kernel -------------------
+KERNEL_START_SECTOR equ 0x9  ;磁盘位置
+KERNEL_BIN_BASE_ADDR equ 0x70000 ;kernel读取的位置
+KERNEL_ENTRY_POINT equ 0x1500
+PT_NULL equ 0x0
