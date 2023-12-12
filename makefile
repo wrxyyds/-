@@ -29,8 +29,11 @@ burn_boot:  #將boot的機器碼送入磁盤
 
 build_kernel:  #編譯內核文件
 	gcc-4.4 -o $(main_object) -c -m32 -I lib/kernel/ $(main_source)  
-	nasm -f elf -o build/print.o lib/kernel/print.s
-	ld -m elf_i386 -Ttext 0x00001500 -e main -o $(main_target)  $(main_object) build/print.o
+	nasm -f elf -o ./build/print.o lib/kernel/print.s
+	nasm -f elf -o ./build/kernel.o kernel/kernel.s 
+	gcc-4.4 -o ./build/interrupt.o -c -m32 -I ./kernel ./kernel/interrupt.c 
+	gcc-4.4 -o ./build/init.o -c -m32 -I ./kernel ./kernel/init.c 
+	ld -m elf_i386 -Ttext 0x00001500 -e main -o $(main_target)  $(main_object) build/print.o build/init.o build/interrupt.o build/kernel.o
 
 burn_kernel:   #將內核送入磁盤
 	dd if=$(main_target) of=$(hard_disk) bs=512 count=200 conv=notrunc seek=9
