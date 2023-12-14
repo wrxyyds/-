@@ -1,7 +1,8 @@
 #include "init.h"
 #include "interrupt.h"
+#include "stdint.h"
 
-extern put_str;
+extern void put_str(char* s);
 
 /*负责初始化所有模块 */
 void init_all() {

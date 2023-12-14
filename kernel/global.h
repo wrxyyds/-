@@ -1,6 +1,6 @@
 #ifndef __KERNEL_GLOBAL_H
 #define __KERNEL_GLOBAL_H
-#include "../stdint.h"
+#include "stdint.h"
 
 //选择子的RPL字段
 #define RPL0 0

@@ -6,7 +6,7 @@
 #define IDT_DESC_CNT 0x21    //支持中断描述符个数为33
 
 extern put_str;
-extern intr_handler intr_entry_table[IDT_DESC_CNT]  //记录每一个中断处理程序的offset
+extern intr_handler intr_entry_table[IDT_DESC_CNT];  //记录每一个中断处理程序的offset
 
 
 //中断门描述符
@@ -15,18 +15,18 @@ struct gate_desc {
     uint16_t selector;             //选择子字段
     uint8_t dcount;                //此项为双字计数字段，是门描述符中的第4字节。这个字段无用
     uint8_t attribute;             //属性字段
-    uint16_t func_offset_high_word //函数偏移高16位地址
-}
+    uint16_t func_offset_high_word; //函数偏移高16位地址
+};
 
-static struct gate_desc idt[IDT_DESC_CNT] //idt表
+static struct gate_desc idt[IDT_DESC_CNT]; //idt表
 
 static void make_idt_desc(struct gate_desc* p_gdesc, uint8_t attr, intr_handler function)
 {
     p_gdesc->func_offset_low_word = (uint32_t)function & 0x0000FFFF;
-    p_gdesc->selector = SELECTOR_K_CODE;
+    p_gdesc->selector = SELECT_K_CODE;
     p_gdesc->dcount = 0;
     p_gdesc->attribute = attr;
-    p_gdesc->func_offset_high_word = ((uint_32_t)function & 0xFFFF0000) >> 16;
+    p_gdesc->func_offset_high_word = ((uint32_t)function & 0xFFFF0000) >> 16;
 }
 
 static void idt_desc_init()
